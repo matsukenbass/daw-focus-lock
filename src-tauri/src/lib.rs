@@ -58,6 +58,88 @@ fn get_idle_seconds() -> u64 {
     0
 }
 
+#[cfg(target_os = "windows")]
+mod win32_focus {
+    use std::ffi::OsString;
+    use std::os::windows::ffi::OsStringExt;
+
+    type BOOL = i32;
+    type HWND = isize;
+    type LPARAM = isize;
+    type WNDENUMPROC = unsafe extern "system" fn(HWND, LPARAM) -> BOOL;
+
+    #[link(name = "user32")]
+    extern "system" {
+        fn EnumWindows(lpEnumFunc: WNDENUMPROC, lParam: LPARAM) -> BOOL;
+        fn GetWindowTextW(hWnd: HWND, lpString: *mut u16, nMaxCount: i32) -> i32;
+        fn SetForegroundWindow(hWnd: HWND) -> BOOL;
+        fn ShowWindow(hWnd: HWND, nCmdShow: i32) -> BOOL;
+        fn IsIconic(hWnd: HWND) -> BOOL;
+        fn keybd_event(bVk: u8, bScan: u8, dwFlags: u32, dwExtraInfo: usize);
+    }
+
+    const VK_MENU: u8 = 0x12; // ALT キー
+    const KEYEVENTF_KEYUP: u32 = 0x0002;
+    const SW_RESTORE: i32 = 9;
+
+    struct EnumContext {
+        target_keywords: Vec<String>,
+        found_hwnd: Option<HWND>,
+    }
+
+    unsafe extern "system" fn enum_windows_callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
+        let ctx = &mut *(lparam as *mut EnumContext);
+        
+        let mut buffer = [0u16; 512];
+        let len = GetWindowTextW(hwnd, buffer.as_mut_ptr(), 512);
+        if len > 0 {
+            let title = OsString::from_wide(&buffer[..len as usize])
+                .to_string_lossy()
+                .to_lowercase();
+            
+            if ctx.target_keywords.iter().any(|k| title.contains(&k.to_lowercase())) {
+                ctx.found_hwnd = Some(hwnd);
+                return 0; // スキャンを終了
+            }
+        }
+        1 // スキャンを継続
+    }
+
+    pub fn focus_window(daw_name: &str) -> bool {
+        unsafe {
+            let keywords = vec![
+                daw_name.to_string(),
+                "Studio One".to_string(),
+                "Studio Pro".to_string(),
+            ];
+            
+            let mut ctx = EnumContext {
+                target_keywords: keywords,
+                found_hwnd: None,
+            };
+
+            let ctx_ptr = &mut ctx as *mut EnumContext as LPARAM;
+            EnumWindows(enum_windows_callback, ctx_ptr);
+
+            if let Some(hwnd) = ctx.found_hwnd {
+                // 最小化されている場合は元のサイズに復元する
+                if IsIconic(hwnd) != 0 {
+                    ShowWindow(hwnd, SW_RESTORE);
+                }
+                
+                // ALTキーをダミー送信してフォーカス強奪制限（Focus Stealing Prevention）をバイパス
+                keybd_event(VK_MENU, 0, 0, 0);
+                keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, 0);
+                
+                SetForegroundWindow(hwnd);
+                true
+            } else {
+                false
+            }
+        }
+    }
+}
+
 /// 指定されたDAWにフォーカスを強制移動
 #[tauri::command]
 fn focus_daw(daw_name: String) {
@@ -85,22 +167,7 @@ fn focus_daw(daw_name: String) {
 
     #[cfg(target_os = "windows")]
     {
-        // 過去・現在・未来 of Studio Pro family and major DAWs window title support
-        let command = format!(
-            r#"
-            $wshell = New-Object -ComObject Wscript.Shell;
-            $wshell.SendKeys("%");
-            $wshell.AppActivate("{}");
-            $wshell.AppActivate("Studio One");
-            $wshell.AppActivate("Studio Pro");
-            "#,
-            daw_name
-        );
-        
-        // -WindowStyle Hidden を指定して対話型セッション内でウィンドウを非表示で安全に実行する
-        let _ = std::process::Command::new("powershell")
-            .args(["-WindowStyle", "Hidden", "-Command", &command])
-            .spawn();
+        let _ = win32_focus::focus_window(&daw_name);
     }
 }
 
