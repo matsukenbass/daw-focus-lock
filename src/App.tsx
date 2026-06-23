@@ -6,7 +6,7 @@ interface Service { id: string; name: string; keywords: string[]; enabled: boole
 interface DawPreset { id: string; name: string; keywords: string[]; focusName: string; }
 
 const DAW_PRESETS: DawPreset[] = [
-  { id: 'fender-studio', name: 'Fender Studio / Studio One', keywords: ['Fender Studio', 'Studio One', 'Studio Pro'], focusName: 'Fender Studio' },
+  { id: 'fender-studio', name: 'Fender Studio Pro 8', keywords: ['Studio Pro', 'Fender Studio', 'Studio One'], focusName: 'Studio Pro 8' },
   { id: 'cubase', name: 'Cubase', keywords: ['Cubase'], focusName: 'Cubase' },
   { id: 'logic', name: 'Logic Pro', keywords: ['Logic Pro'], focusName: 'Logic Pro' },
   { id: 'live', name: 'Ableton Live', keywords: ['Live', 'Ableton'], focusName: 'Live' },
@@ -18,7 +18,7 @@ const AVAILABLE_SERVICES: Service[] = [
   { id: 'x', name: 'X / Twitter', keywords: ['twitter', ' / x', 'x.com'], enabled: true },
   { id: 'youtube', name: 'YouTube (Shorts含む)', keywords: ['youtube', 'youtube.com', 'shorts'], enabled: true },
   { id: 'instagram', name: 'Instagram', keywords: ['instagram', 'instagram.com'], enabled: true },
-  { id: 'mixi2', name: 'mixi2', keywords: ['mixi2', 'mixi.social', 'mixi'], enabled: false },
+  { id: 'mixi2', name: 'mixi2', keywords: ['mixi2', 'mixi.social', 'mixi'], enabled: true },
 ];
 
 export default function App() {
@@ -28,22 +28,19 @@ export default function App() {
   const [services, setServices] = useState<Service[]>(AVAILABLE_SERVICES);
   const activeBlacklist = services.filter(s => s.enabled).flatMap(s => s.keywords);
   
-  // currentIdleSeconds をフックから受け取る
   const { timeBank, currentTitle, currentUrl, currentAppName, currentIdleSeconds, status, adjustTimeBank } = useTimeBank(
     activeBlacklist, 
     currentDaw.keywords, 
     currentDaw.focusName
   );
   
+  // 🎯 権限管理をアクセシビリティの1つだけに絞る
   const [hasAccessibility, setHasAccessibility] = useState<boolean>(true);
-  const [hasScreenRecording, setHasScreenRecording] = useState<boolean>(true);
 
   const verifyPermissions = async () => {
     try {
       const axAuth = await invoke<boolean>('check_accessibility');
-      const srAuth = await invoke<boolean>('check_screen_recording');
       setHasAccessibility(axAuth);
-      setHasScreenRecording(srAuth);
     } catch (error) {
       console.error('権限チェックに失敗しました:', error);
     }
@@ -63,18 +60,18 @@ export default function App() {
   const buttonStyle = { padding: '8px 16px', fontSize: '12px', fontWeight: 'bold' as const, backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' };
   const debugButtonStyle = { padding: '6px 12px', fontSize: '11px', fontWeight: 'bold' as const, backgroundColor: '#4b5563', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' };
 
-  if (!hasAccessibility || !hasScreenRecording) {
+  // 🎯 権限エラー画面も最小限にスマート化
+  if (!hasAccessibility) {
     return (
       <div style={{ padding: '40px 24px', fontFamily: 'sans-serif', backgroundColor: '#fef2f2', height: '100vh', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
         <h1 style={{ color: '#dc2626', fontSize: '22px', marginBottom: '12px' }}>🚨 動作には権限の設定が必要です</h1>
         <div style={{ width: '100%', maxWidth: '400px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ backgroundColor: 'white', padding: '16px', borderRadius: '8px', border: `1px solid ${hasAccessibility ? '#bbf7d0' : '#fca5a5'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ textAlign: 'left' }}><div style={{ fontWeight: 'bold', fontSize: '14px' }}>1. アクセシビリティ権限</div><div style={{ fontSize: '12px', color: hasAccessibility ? '#16a34a' : '#dc2626' }}>{hasAccessibility ? '✅ 許可済み' : '❌ 未許可'}</div></div>
-            {!hasAccessibility && <button onClick={() => invoke('open_accessibility_settings')} style={buttonStyle}>設定を開く</button>}
-          </div>
-          <div style={{ backgroundColor: 'white', padding: '16px', borderRadius: '8px', border: `1px solid ${hasScreenRecording ? '#bbf7d0' : '#fca5a5'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ textAlign: 'left' }}><div style={{ fontWeight: 'bold', fontSize: '14px' }}>2. 画面収録権限</div><div style={{ fontSize: '12px', color: hasScreenRecording ? '#16a34a' : '#dc2626' }}>{hasScreenRecording ? '✅ 許可済み' : '❌ 未許可'}</div></div>
-            {!hasScreenRecording && <button onClick={() => invoke('open_screen_recording_settings')} style={buttonStyle}>設定を開く</button>}
+          <div style={{ backgroundColor: 'white', padding: '16px', borderRadius: '8px', border: '1px solid #fca5a5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontWeight: 'bold', fontSize: '14px' }}>アクセシビリティ権限</div>
+              <div style={{ fontSize: '12px', color: '#dc2626' }}>❌ 未許可（ウインドウ監視に必要です）</div>
+            </div>
+            <button onClick={() => invoke('open_accessibility_settings')} style={buttonStyle}>設定を開く</button>
           </div>
         </div>
       </div>
@@ -150,15 +147,12 @@ export default function App() {
           <span style={{ fontSize: '11px', color: '#888' }}> 検出中のアプリ名</span>
           <strong style={{ fontSize: '12px', color: '#333' }}>{currentAppName || '検出中...'}</strong>
         </div>
-        
-        {/* ⏳ 【新機能】PC全体の無操作カウントダウンを表示 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #eee', paddingBottom: '4px' }}>
           <span style={{ fontSize: '11px', color: '#888' }}>PC全体の無操作時間</span>
           <strong style={{ fontSize: '12px', color: currentIdleSeconds >= 30 ? '#dc2626' : '#16a34a' }}>
-            {currentIdleSeconds} 秒 {currentIdleSeconds >= 30 ? '⚠️ 放置中 (貯金ストップ)' : '🐾 操作中'}
+            {currentIdleSeconds} 秒 {currentIdleSeconds >= 30 ? '⚠️ 放置中' : '🐾 操作中'}
           </strong>
         </div>
-
         <div style={{ textAlign: 'left' }}>
           <p style={{ fontSize: '11px', margin: '0 0 2px 0', color: '#888' }}>検出中のウィンドウタイトル</p>
           <code style={{ fontSize: '13px', wordBreak: 'break-all', color: '#333' }}>{currentTitle}</code>
