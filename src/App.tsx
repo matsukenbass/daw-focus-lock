@@ -57,12 +57,35 @@ export default function App() {
   const [hasAccessibility, setHasAccessibility] = useState<boolean>(true);
 
   const currentDaw = DAW_PRESETS.find(d => d.id === selectedDawId) || DAW_PRESETS[0];
+  
+  // WindowsなどURLが取得できない（空文字）環境向けのブラックリスト一括化処理
+  const isWindows = typeof window !== 'undefined' && /win/i.test(navigator.userAgent || '');
+
   const activeBlacklist = services
-    .filter(s => s.enabled)
-    .map(s => ({
-      keywords: s.keywords,
-      excludeKeywords: s.excludeKeywords
-    }));
+    .filter(s => {
+      if (isWindows) {
+        // Windows環境では、通常YouTubeまたはShortsのいずれか一方が有効なら両方を制限対象にする
+        if (s.id === 'youtube' || s.id === 'youtube-shorts') {
+          return services.some(
+            item => (item.id === 'youtube' || item.id === 'youtube-shorts') && item.enabled
+          );
+        }
+      }
+      return s.enabled;
+    })
+    .map(s => {
+      if (isWindows && (s.id === 'youtube' || s.id === 'youtube-shorts')) {
+        // Windowsでは通常動画とShortsをURLで除外判定できないため、除外ルールを解除して一括制限する
+        return {
+          keywords: s.keywords,
+          excludeKeywords: []
+        };
+      }
+      return {
+        keywords: s.keywords,
+        excludeKeywords: s.excludeKeywords
+      };
+    });
   
   const { 
     formattedTime, 
@@ -91,7 +114,20 @@ export default function App() {
   }, []);
 
   const toggleService = useCallback((id: string) => {
-    setServices(prev => prev.map(s => s.id === id ? { ...s, enabled: !s.enabled } : s));
+    setServices(prev => {
+      if (id === 'youtube-merged') {
+        // Windows環境用：どちらか一方がONなら両方をOFFに、両方OFFなら両方をONにトグルする
+        const isCurrentlyEnabled = prev.some(
+          s => (s.id === 'youtube' || s.id === 'youtube-shorts') && s.enabled
+        );
+        return prev.map(s => 
+          (s.id === 'youtube' || s.id === 'youtube-shorts')
+            ? { ...s, enabled: !isCurrentlyEnabled }
+            : s
+        );
+      }
+      return prev.map(s => s.id === id ? { ...s, enabled: !s.enabled } : s);
+    });
   }, []);
 
   // 🚨 権限エラー画面
@@ -127,6 +163,28 @@ export default function App() {
         return '☕ 待機中';
     }
   };
+
+  // UIに表示する制限サービス一覧（WindowsではYouTube関連をマージ）
+  const visibleServices = services.reduce<Service[]>((acc, service) => {
+    if (isWindows) {
+      if (service.id === 'youtube') {
+        const isShortsEnabled = services.find(s => s.id === 'youtube-shorts')?.enabled;
+        acc.push({
+          id: 'youtube-merged',
+          name: 'YouTube (Shorts含む)',
+          keywords: ['youtube.com', 'youtube', 'shorts'],
+          enabled: service.enabled || !!isShortsEnabled
+        });
+      } else if (service.id === 'youtube-shorts') {
+        // Shortsはマージされるため、個別のトグルとしては表示しない
+      } else {
+        acc.push(service);
+      }
+    } else {
+      acc.push(service);
+    }
+    return acc;
+  }, []);
 
   return (
     <div className="app-container">
@@ -181,7 +239,7 @@ export default function App() {
       <div className="card">
         <h3 className="card-title">🛡️ 制限するサービス</h3>
         <div className="flex-column-gap">
-          {services.map(service => (
+          {visibleServices.map(service => (
             <div key={service.id} className="toggle-row">
               <span 
                 className="service-name" 
