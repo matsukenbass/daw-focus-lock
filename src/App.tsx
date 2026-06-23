@@ -94,6 +94,7 @@ export default function App() {
     currentAppName, 
     currentIdleSeconds, 
     status, 
+    hasAccessibilityError,
     adjustTimeBank 
   } = useTimeBank(activeBlacklist, currentDaw.keywords, currentDaw.focusName);
 
@@ -131,7 +132,7 @@ export default function App() {
   }, []);
 
   // 🚨 権限エラー画面
-  if (!hasAccessibility) {
+  if (!hasAccessibility || hasAccessibilityError) {
     return (
       <div className="error-container">
         <h1 className="error-title">🚨 動作には権限の設定が必要です</h1>
@@ -139,7 +140,11 @@ export default function App() {
           <div className="error-card-row">
             <div>
               <div className="error-card-label">アクセシビリティ権限</div>
-              <div className="error-subtext">❌ 未許可（ウインドウ監視に必要です）</div>
+              <div className="error-subtext">
+                {hasAccessibilityError 
+                  ? '⚠️ 許可済に見えますが、OSが拒否しています' 
+                  : '❌ 未許可（ウインドウ監視に必要です）'}
+              </div>
             </div>
             <button 
               onClick={() => invoke('open_accessibility_settings')} 
@@ -148,6 +153,14 @@ export default function App() {
               設定を開く
             </button>
           </div>
+
+          {hasAccessibilityError && (
+            <div style={{ marginTop: '16px', fontSize: '13px', color: 'var(--text-secondary)', textAlign: 'left', borderTop: '1px solid rgba(244, 63, 94, 0.2)', paddingTop: '16px', lineHeight: '1.5' }}>
+              <strong style={{ color: 'var(--color-drain)', display: 'block', marginBottom: '8px' }}>💡 解決手順 (macOSのバグ対策)：</strong>
+              1. システム設定の「アクセシビリティ」から <strong>daw-focus-lock</strong> をマイナス（<code>-</code>）ボタンで一度完全に削除します。<br />
+              2. 本アプリを再起動し、再度リストに追加してチェックをONにしてください。
+            </div>
+          )}
         </div>
       </div>
     );

@@ -34,6 +34,7 @@ export const useTimeBank = (blacklist: BlacklistItem[], dawKeywords: string[], d
   const [currentAppName, setCurrentAppName] = useState<string>('');
   const [currentIdleSeconds, setCurrentIdleSeconds] = useState<number>(0);
   const [status, setStatus] = useState<'BUILD' | 'DRAIN' | 'IDLE'>('IDLE');
+  const [hasAccessibilityError, setHasAccessibilityError] = useState<boolean>(false);
 
   const blacklistRef = useRef<BlacklistItem[]>(blacklist);
   const dawKeywordsRef = useRef(dawKeywords);
@@ -52,6 +53,8 @@ export const useTimeBank = (blacklist: BlacklistItem[], dawKeywords: string[], d
 
     const setupListener = async () => {
       const unlisten = await listen<WindowInfo>('window-focus-changed', (event) => {
+        // 正常にウィンドウイベントを受信できたらエラーをリセット
+        setHasAccessibilityError(false);
         const { title, url, app_name, idle_seconds } = event.payload;
         
         if (!title || title.trim() === '') return;
@@ -129,11 +132,21 @@ export const useTimeBank = (blacklist: BlacklistItem[], dawKeywords: string[], d
         }
       });
 
+      const unlistenError = await listen<boolean>('accessibility-error', (event) => {
+        if (event.payload) {
+          setHasAccessibilityError(true);
+        }
+      });
+
       // 非同期解決の間にアンマウントされた場合は即座にリスナー解除する
       if (!active) {
         unlisten();
+        unlistenError();
       } else {
-        unlistenFunc = unlisten;
+        unlistenFunc = () => {
+          unlisten();
+          unlistenError();
+        };
       }
     };
 
@@ -162,6 +175,7 @@ export const useTimeBank = (blacklist: BlacklistItem[], dawKeywords: string[], d
     currentAppName, 
     currentIdleSeconds, 
     status, 
+    hasAccessibilityError,
     adjustTimeBank 
   };
 };

@@ -13,16 +13,11 @@ struct WindowInfo {
 #[cfg(target_os = "macos")]
 extern "C" {
     fn AXIsProcessTrusted() -> bool;
-    fn dlopen(filename: *const std::os::raw::c_char, flag: std::os::raw::c_int) -> *mut std::os::raw::c_void;
-    fn dlsym(handle: *mut std::os::raw::c_void, symbol: *const std::os::raw::c_char) -> *mut std::os::raw::c_void;
-    fn dlclose(handle: *mut std::os::raw::c_void) -> std::os::raw::c_int;
 }
 
+/// システム全体の無操作時間（秒）を取得
 #[cfg(target_os = "macos")]
-const RTLD_LAZY: std::os::raw::c_int = 1;
-
-#[cfg(target_os = "macos")]
-fn get_idle_seconds_fallback() -> u64 {
+fn get_idle_seconds() -> u64 {
     let cmd = "ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print int($NF/1000000000); exit}'";
     std::process::Command::new("sh")
         .args(["-c", cmd])
@@ -31,27 +26,6 @@ fn get_idle_seconds_fallback() -> u64 {
         .and_then(|output| String::from_utf8(output.stdout).ok())
         .and_then(|s| s.trim().parse::<u64>().ok())
         .unwrap_or(0)
-}
-
-/// システム全体の無操作時間（秒）を取得
-#[cfg(target_os = "macos")]
-fn get_idle_seconds() -> u64 {
-    unsafe {
-        let lib_path = std::ffi::CString::new("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics").unwrap();
-        let handle = dlopen(lib_path.as_ptr(), RTLD_LAZY);
-        if !handle.is_null() {
-            let symbol_name = std::ffi::CString::new("CGEventSourceSecondsSinceLastInputType").unwrap();
-            let symbol = dlsym(handle, symbol_name.as_ptr());
-            if !symbol.is_null() {
-                let func: extern "C" fn(i32) -> f64 = std::mem::transmute(symbol);
-                let idle = func(-1) as u64;
-                dlclose(handle);
-                return idle;
-            }
-            dlclose(handle);
-        }
-    }
-    get_idle_seconds_fallback()
 }
 
 /// macOSで指定されたブラウザのアクティブなタブのURLを取得する
@@ -167,26 +141,30 @@ pub fn run() {
                 loop {
                     tokio::time::sleep(Duration::from_secs(1)).await;
                     
-                    // 🎯 ネストを解消（エラー時は早期リターンして次のループへ）
-                    let Ok(active_window) = get_active_window() else {
-                        continue;
-                    };
-                    
-                    let app_name = active_window.app_name;
-                    
-                    #[cfg(target_os = "macos")]
-                    let url = get_browser_url(&app_name);
-                    #[cfg(not(target_os = "macos"))]
-                    let url = String::new();
+                    // 🎯 アクティブウィンドウの取得結果に応じてイベントを分岐（権限エラー検知のため）
+                    match get_active_window() {
+                        Ok(active_window) => {
+                            let app_name = active_window.app_name;
+                            
+                            #[cfg(target_os = "macos")]
+                            let url = get_browser_url(&app_name);
+                            #[cfg(not(target_os = "macos"))]
+                            let url = String::new();
 
-                    let info = WindowInfo {
-                        title: active_window.title,
-                        url,
-                        app_name,
-                        idle_seconds: get_idle_seconds(),
-                    };
+                            let info = WindowInfo {
+                                title: active_window.title,
+                                url,
+                                app_name,
+                                idle_seconds: get_idle_seconds(),
+                            };
 
-                    let _ = app_handle.emit("window-focus-changed", info);
+                            let _ = app_handle.emit("window-focus-changed", info);
+                        }
+                        Err(_) => {
+                            // 権限がないなどのエラー時にフロントへ警告イベントを送る
+                            let _ = app_handle.emit("accessibility-error", true);
+                        }
+                    }
                 }
             });
 
