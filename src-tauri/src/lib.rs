@@ -65,8 +65,6 @@ fn focus_daw(daw_name: String) {
             r#"
             $wshell = New-Object -ComObject Wscript.Shell;
             $wshell.AppActivate("{}");
-            $wshell.AppActivate("Studio Pro");
-            $wshell.AppActivate("Studio One");
             "#,
             daw_name
         );
@@ -76,11 +74,16 @@ fn focus_daw(daw_name: String) {
     }
 }
 
-// 🎯 アクセシビリティチェック（ウインドウ情報の取得に必要）のみ残す
 #[tauri::command]
 fn check_accessibility() -> bool {
-    #[cfg(target_os = "macos")] { unsafe { AXIsProcessTrusted() } }
-    #[cfg(not(target_os = "macos"))] { true }
+    #[cfg(target_os = "macos")]
+    {
+        unsafe { AXIsProcessTrusted() }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        true
+    }
 }
 
 #[tauri::command]
