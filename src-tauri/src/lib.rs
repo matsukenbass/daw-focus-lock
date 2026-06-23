@@ -85,12 +85,11 @@ fn focus_daw(daw_name: String) {
 
     #[cfg(target_os = "windows")]
     {
-        use std::os::windows::process::CommandExt;
-
-        // 過去・現在・未来のStudio Proファミリー、および主要DAWのウィンドウタイトルに対応
+        // 過去・現在・未来 of Studio Pro family and major DAWs window title support
         let command = format!(
             r#"
             $wshell = New-Object -ComObject Wscript.Shell;
+            $wshell.SendKeys("%");
             $wshell.AppActivate("{}");
             $wshell.AppActivate("Studio One");
             $wshell.AppActivate("Studio Pro");
@@ -98,10 +97,9 @@ fn focus_daw(daw_name: String) {
             daw_name
         );
         
-        // CREATE_NO_WINDOW (0x08000000) フラグを設定してコンソール画面のポップアップを防ぐ
+        // -WindowStyle Hidden を指定して対話型セッション内でウィンドウを非表示で安全に実行する
         let _ = std::process::Command::new("powershell")
-            .args(["-Command", &command])
-            .creation_flags(0x08000000)
+            .args(["-WindowStyle", "Hidden", "-Command", &command])
             .spawn();
     }
 }
