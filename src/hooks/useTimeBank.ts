@@ -86,6 +86,23 @@ export const useTimeBank = (blacklist: BlacklistItem[], dawKeywords: string[], d
         else if (
           BROWSER_APPS.includes(app_name) &&
           currentBlacklist.some(item => {
+            // WindowsなどURLが取得できない（空文字）環境向けのフォールバック処理
+            if (!url || url.trim() === '') {
+              const isYoutubeRelated = item.keywords.some(k => 
+                k.toLowerCase().includes('youtube') || k.toLowerCase().includes('shorts')
+              );
+              
+              if (isYoutubeRelated) {
+                // YouTube関連の場合、URLで区別できないため、通常動画かShortsのいずれか一方が
+                // 有効であれば、タイトル部分一致（除外ルール無視）で一括ブロック対象とする
+                return item.keywords.some(k => {
+                  const lowKey = k.toLowerCase();
+                  return lowerTitle.includes(lowKey);
+                });
+              }
+            }
+
+            // 通常の判定（URLが取得できている環境、またはYouTube関連以外のサービス）
             const hasKeyword = item.keywords.some(k => {
               const lowKey = k.toLowerCase();
               return lowerTitle.includes(lowKey) || lowerUrl.includes(lowKey);
