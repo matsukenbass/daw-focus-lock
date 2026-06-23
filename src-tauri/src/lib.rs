@@ -7,6 +7,7 @@ struct WindowInfo {
     title: String,
     url: String,
     app_name: String,
+    idle_seconds: u64, // 👈 【新機能】システム全体の無操作秒数
 }
 
 #[cfg(target_os = "macos")]
@@ -20,28 +21,53 @@ extern "C" {
     fn CGPreflightScreenCaptureAccess() -> bool;
 }
 
+// ⏳ 【新機能】macOS用のシステム全体の無操作時間（秒）を取得する関数
+#[cfg(target_os = "macos")]
+fn get_idle_seconds() -> u64 {
+    if let Ok(output) = std::process::Command::new("sh")
+        .arg("-c")
+        .arg("ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print int($NF/1000000000); exit}'")
+        .output() 
+    {
+        let out_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        out_str.parse::<u64>().unwrap_or(0)
+    } else {
+        0
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn get_idle_seconds() -> u64 {
+    0
+}
+
 #[tauri::command]
-fn focus_daw() {
+fn focus_daw(daw_name: String) {
     #[cfg(target_os = "macos")]
     {
-        let script = r#"
+        let script = format!(
+            r#"
             try
                 tell application "System Events"
-                    set dawProcess to first process whose name contains "Studio One"
+                    set dawProcess to first process whose name contains "{}"
                     set frontmost of dawProcess to true
                 end tell
             end try
-        "#;
-        let _ = std::process::Command::new("osascript").arg("-e").arg(script).spawn();
+            "#,
+            daw_name
+        );
+        let _ = std::process::Command::new("osascript").arg("-e").arg(&script).spawn();
     }
     #[cfg(target_os = "windows")]
     {
-        let command = r#"
+        let command = format!(
+            r#"
             $wshell = New-Object -ComObject Wscript.Shell;
-            $wshell.AppActivate("Studio One");
-        "#;
-        let _ = std::process::Command::new("powershell").arg("-Command")
-            .arg(command).spawn();
+            $wshell.AppActivate("{}");
+            "#,
+            daw_name
+        );
+        let _ = std::process::Command::new("powershell").arg("-Command").arg(&command).spawn();
     }
 }
 
@@ -111,15 +137,12 @@ pub fn run() {
                                 if let Ok(output) = std::process::Command::new("osascript").arg("-e").arg(&script).output() {
                                     url = String::from_utf8_lossy(&output.stdout).trim().to_string();
                                 }
-                            } 
-                            // 👈 【修正】Arc専用に、解釈エラーの起きない強固なスクリプト構文へ変更
-                            else if app_name == "Arc" {
+                            } else if app_name == "Arc" {
                                 let script = "tell application \"Arc\" to tell window 1 to return URL of active tab";
                                 if let Ok(output) = std::process::Command::new("osascript").arg("-e").arg(script).output() {
                                     url = String::from_utf8_lossy(&output.stdout).trim().to_string();
                                 }
-                            } 
-                            else if app_name == "Safari" {
+                            } else if app_name == "Safari" {
                                 let script = "tell application \"Safari\" to return URL of current tab of front window";
                                 if let Ok(output) = std::process::Command::new("osascript").arg("-e").arg(script).output() {
                                     url = String::from_utf8_lossy(&output.stdout).trim().to_string();
@@ -131,6 +154,7 @@ pub fn run() {
                             title: active_window.title,
                             url: url,
                             app_name: app_name,
+                            idle_seconds: get_idle_seconds(), // 👈 放置秒数をのせてフロントにブロードキャスト
                         };
 
                         let _ = app_handle.emit("window-focus-changed", info);
