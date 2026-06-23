@@ -39,6 +39,7 @@ export const useTimeBank = (blacklist: BlacklistItem[], dawKeywords: string[], d
   const blacklistRef = useRef<BlacklistItem[]>(blacklist);
   const dawKeywordsRef = useRef(dawKeywords);
   const dawNameForFocusRef = useRef(dawNameForFocus);
+  const lastFocusTimeRef = useRef<number>(0);
 
   useEffect(() => {
     blacklistRef.current = blacklist;
@@ -120,7 +121,12 @@ export const useTimeBank = (blacklist: BlacklistItem[], dawKeywords: string[], d
           setStatus('DRAIN');
           setTimeBank((prev) => {
             if (prev <= 1) {
-              invoke('focus_daw', { dawName: dawNameForFocusRef.current }).catch(console.error);
+              const now = Date.now();
+              // 最前面移動コマンドの連打（PowerShellの連続起動）を防ぐため、5秒のクールダウンを設ける
+              if (now - lastFocusTimeRef.current > 5000) {
+                lastFocusTimeRef.current = now;
+                invoke('focus_daw', { dawName: dawNameForFocusRef.current }).catch(console.error);
+              }
               return 0;
             }
             return prev - 1;
