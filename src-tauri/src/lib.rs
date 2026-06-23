@@ -13,11 +13,16 @@ struct WindowInfo {
 #[cfg(target_os = "macos")]
 extern "C" {
     fn AXIsProcessTrusted() -> bool;
+    fn dlopen(filename: *const std::os::raw::c_char, flag: std::os::raw::c_int) -> *mut std::os::raw::c_void;
+    fn dlsym(handle: *mut std::os::raw::c_void, symbol: *const std::os::raw::c_char) -> *mut std::os::raw::c_void;
+    fn dlclose(handle: *mut std::os::raw::c_void) -> std::os::raw::c_int;
 }
 
-/// システム全体の無操作時間（秒）を取得
 #[cfg(target_os = "macos")]
-fn get_idle_seconds() -> u64 {
+const RTLD_LAZY: std::os::raw::c_int = 1;
+
+#[cfg(target_os = "macos")]
+fn get_idle_seconds_fallback() -> u64 {
     let cmd = "ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print int($NF/1000000000); exit}'";
     std::process::Command::new("sh")
         .args(["-c", cmd])
@@ -27,6 +32,52 @@ fn get_idle_seconds() -> u64 {
         .and_then(|s| s.trim().parse::<u64>().ok())
         .unwrap_or(0)
 }
+
+/// システム全体の無操作時間（秒）を取得
+#[cfg(target_os = "macos")]
+fn get_idle_seconds() -> u64 {
+    unsafe {
+        let lib_path = std::ffi::CString::new("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics").unwrap();
+        let handle = dlopen(lib_path.as_ptr(), RTLD_LAZY);
+        if !handle.is_null() {
+            let symbol_name = std::ffi::CString::new("CGEventSourceSecondsSinceLastInputType").unwrap();
+            let symbol = dlsym(handle, symbol_name.as_ptr());
+            if !symbol.is_null() {
+                let func: extern "C" fn(i32) -> f64 = std::mem::transmute(symbol);
+                let idle = func(-1) as u64;
+                dlclose(handle);
+                return idle;
+            }
+            dlclose(handle);
+        }
+    }
+    get_idle_seconds_fallback()
+}
+
+/// macOSで指定されたブラウザのアクティブなタブのURLを取得する
+#[cfg(target_os = "macos")]
+fn get_browser_url(app_name: &str) -> String {
+    let script = match app_name {
+        "Google Chrome" | "Brave Browser" | "Microsoft Edge" | "Vivaldi" => {
+            format!("tell application \"{}\" to return URL of active tab of front window", app_name)
+        }
+        "Arc" => {
+            "tell application \"Arc\" to tell window 1 to return URL of active tab".to_string()
+        }
+        "Safari" => {
+            "tell application \"Safari\" to return URL of current tab of front window".to_string()
+        }
+        _ => return String::new(),
+    };
+
+    std::process::Command::new("osascript")
+        .args(["-e", &script])
+        .output()
+        .ok()
+        .map(|out| String::from_utf8_lossy(&out.stdout).trim().to_string())
+        .unwrap_or_default()
+}
+
 
 #[cfg(not(target_os = "macos"))]
 fn get_idle_seconds() -> u64 {
@@ -121,35 +172,12 @@ pub fn run() {
                         continue;
                     };
                     
-                    let mut url = String::new();
                     let app_name = active_window.app_name;
                     
                     #[cfg(target_os = "macos")]
-                    {
-                        // 🎯 AppleScript実行処理をDRYに共通化
-                        let run_osascript = |script: &str| -> String {
-                            std::process::Command::new("osascript")
-                                .args(["-e", script])
-                                .output()
-                                .ok()
-                                .map(|out| String::from_utf8_lossy(&out.stdout).trim().to_string())
-                                .unwrap_or_default()
-                        };
-
-                        match app_name.as_str() {
-                            "Google Chrome" | "Brave Browser" | "Microsoft Edge" | "Vivaldi" => {
-                                let script = format!("tell application \"{}\" to return URL of active tab of front window", app_name);
-                                url = run_osascript(&script);
-                            }
-                            "Arc" => {
-                                url = run_osascript("tell application \"Arc\" to tell window 1 to return URL of active tab");
-                            }
-                            "Safari" => {
-                                url = run_osascript("tell application \"Safari\" to return URL of current tab of front window");
-                            }
-                            _ => {}
-                        }
-                    }
+                    let url = get_browser_url(&app_name);
+                    #[cfg(not(target_os = "macos"))]
+                    let url = String::new();
 
                     let info = WindowInfo {
                         title: active_window.title,

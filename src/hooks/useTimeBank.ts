@@ -1,19 +1,33 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 
-interface WindowInfo {
+export interface WindowInfo {
   title: string;
   url: string;
   app_name: string;
   idle_seconds: number;
 }
 
+export interface BlacklistItem {
+  keywords: string[];
+  excludeKeywords?: string[];
+}
+
 const BROWSER_APPS = [
   'Google Chrome', 'Safari', 'Arc', 'Brave Browser', 'Microsoft Edge', 'Vivaldi'
 ];
 
-export const useTimeBank = (blacklist: string[], dawKeywords: string[], dawNameForFocus: string) => {
+/**
+ * 秒数を受け取り、 "M:SS" 形式の文字列にフォーマットする
+ */
+export const formatTime = (seconds: number): string => {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+};
+
+export const useTimeBank = (blacklist: BlacklistItem[], dawKeywords: string[], dawNameForFocus: string) => {
   const [timeBank, setTimeBank] = useState<number>(0);
   const [currentTitle, setCurrentTitle] = useState<string>('監視未始動');
   const [currentUrl, setCurrentUrl] = useState<string>('');
@@ -21,7 +35,7 @@ export const useTimeBank = (blacklist: string[], dawKeywords: string[], dawNameF
   const [currentIdleSeconds, setCurrentIdleSeconds] = useState<number>(0);
   const [status, setStatus] = useState<'BUILD' | 'DRAIN' | 'IDLE'>('IDLE');
 
-  const blacklistRef = useRef(blacklist);
+  const blacklistRef = useRef<BlacklistItem[]>(blacklist);
   const dawKeywordsRef = useRef(dawKeywords);
   const dawNameForFocusRef = useRef(dawNameForFocus);
 
@@ -32,7 +46,7 @@ export const useTimeBank = (blacklist: string[], dawKeywords: string[], dawNameF
   }, [blacklist, dawKeywords, dawNameForFocus]);
 
   useEffect(() => {
-    // 🎯 【新ロジック】この useEffect が現在も有効かどうかを追跡するフラグ
+    // コンポーネントのクリーンアップ時およびアンマウント時に非同期リスナーを追跡するフラグ
     let active = true; 
     let unlistenFunc: (() => void) | undefined;
 
@@ -54,7 +68,7 @@ export const useTimeBank = (blacklist: string[], dawKeywords: string[], dawNameF
         const currentDawKeywords = dawKeywordsRef.current;
         const currentBlacklist = blacklistRef.current;
 
-        // 1. 加算判定
+        // 1. 加算判定 (DAWソフトがアクティブ & 30秒未満操作があるとき)
         if (
           currentDawKeywords.some(keyword => 
             lowerTitle.includes(keyword.toLowerCase()) || 
@@ -68,12 +82,19 @@ export const useTimeBank = (blacklist: string[], dawKeywords: string[], dawNameF
             setStatus('BUILD');
           }
         } 
-        // 2. 減算判定
+        // 2. 減算判定 (ブラウザがアクティブ & ブラックリストURL/タイトルのとき)
         else if (
           BROWSER_APPS.includes(app_name) &&
-          currentBlacklist.some(keyword => {
-            const lowKey = keyword.toLowerCase();
-            return lowerTitle.includes(lowKey) || lowerUrl.includes(lowKey);
+          currentBlacklist.some(item => {
+            const hasKeyword = item.keywords.some(k => {
+              const lowKey = k.toLowerCase();
+              return lowerTitle.includes(lowKey) || lowerUrl.includes(lowKey);
+            });
+            const hasExclude = item.excludeKeywords?.some(ex => {
+              const lowEx = ex.toLowerCase();
+              return lowerTitle.includes(lowEx) || lowerUrl.includes(lowEx);
+            }) ?? false;
+            return hasKeyword && !hasExclude;
           })
         ) {
           setStatus('DRAIN');
@@ -91,36 +112,39 @@ export const useTimeBank = (blacklist: string[], dawKeywords: string[], dawNameF
         }
       });
 
-      // 🎯 【重要】非同期処理を待っている間に、すでにコンポーネントがアンマウントされていた場合
+      // 非同期解決の間にアンマウントされた場合は即座にリスナー解除する
       if (!active) {
-        unlisten(); // 作られたゾンビリスナーをその場で即座に処刑（解除）する
+        unlisten();
       } else {
-        unlistenFunc = unlisten; // まだ生きていれば変数に保持
+        unlistenFunc = unlisten;
       }
     };
 
     setupListener();
 
     return () => {
-      active = false; // 1回目の高速アンマウント時にここが true になる
+      active = false;
       if (unlistenFunc) {
         unlistenFunc();
       }
     };
   }, []);
 
-  const adjustTimeBank = (amountSeconds: number) => {
+  const adjustTimeBank = useCallback((amountSeconds: number) => {
     setTimeBank((prev) => {
       const nextTime = prev + amountSeconds;
       return nextTime < 0 ? 0 : nextTime;
     });
-  };
+  }, []);
 
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
+  return { 
+    timeBank, 
+    formattedTime: formatTime(timeBank), 
+    currentTitle, 
+    currentUrl, 
+    currentAppName, 
+    currentIdleSeconds, 
+    status, 
+    adjustTimeBank 
   };
-
-  return { timeBank: formatTime(timeBank), currentTitle, currentUrl, currentAppName, currentIdleSeconds, status, adjustTimeBank };
 };
