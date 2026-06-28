@@ -29,6 +29,11 @@ fn get_idle_seconds() -> u64 {
         .unwrap_or(0)
 }
 
+#[cfg(not(target_os = "macos"))]
+fn get_idle_seconds() -> u64 {
+    0
+}
+
 /// macOSで指定されたブラウザのアクティブなタブのURLを取得する
 #[cfg(target_os = "macos")]
 fn get_browser_url(app_name: &str) -> String {
@@ -53,10 +58,10 @@ fn get_browser_url(app_name: &str) -> String {
         .unwrap_or_default()
 }
 
-
+/// macOS以外のOSではブラウザのURL取得は未対応のため空文字列を返す
 #[cfg(not(target_os = "macos"))]
-fn get_idle_seconds() -> u64 {
-    0
+fn get_browser_url(_app_name: &str) -> String {
+    String::new()
 }
 
 #[cfg(target_os = "windows")]
@@ -271,11 +276,7 @@ pub fn run() {
                     match get_active_window() {
                         Ok(active_window) => {
                             let app_name = active_window.app_name;
-                            
-                            #[cfg(target_os = "macos")]
                             let url = get_browser_url(&app_name);
-                            #[cfg(not(target_os = "macos"))]
-                            let url = String::new();
 
                             let info = WindowInfo {
                                 title: active_window.title,

@@ -1,7 +1,7 @@
 {
   "name": "daw-focus-lock",
-  "private": true,
   "version": "0.1.2",
+  "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,7 +10,11 @@
     "tauri": "tauri",
     "test:fe": "vitest run",
     "test:be": "cargo test --manifest-path src-tauri/Cargo.toml",
-    "test": "pnpm test:fe && pnpm test:be"
+    "test": "pnpm test:fe && pnpm test:be",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
@@ -25,6 +29,8 @@
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
     "jsdom": "^29.1.1",
+    "oxfmt": "^0.56.0",
+    "oxlint": "^1.71.0",
     "typescript": "~5.8.3",
     "vite": "^7.0.4",
     "vitest": "^4.1.9"

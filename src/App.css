@@ -1,19 +1,28 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap");
 
 :root {
-  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-family:
+    "Outfit",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Oxygen,
+    Ubuntu,
+    Cantarell,
+    sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  
+
   --bg-color: #0b0c10;
   --panel-bg: rgba(22, 26, 36, 0.7);
   --border-color: rgba(255, 255, 255, 0.08);
   --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
   --text-muted: #64748b;
-  
+
   --color-build: #10b981;
   --color-drain: #f43f5e;
   --color-idle: #64748b;
@@ -24,7 +33,7 @@ body {
   margin: 0;
   padding: 0;
   background-color: var(--bg-color);
-  background-image: 
+  background-image:
     radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
     radial-gradient(at 100% 0%, rgba(16, 185, 129, 0.1) 0px, transparent 50%);
   color: var(--text-primary);
@@ -159,7 +168,9 @@ h1.app-title {
   background-color: rgba(15, 23, 42, 0.5);
   cursor: pointer;
   outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
   box-sizing: border-box;
 }
 
@@ -192,7 +203,9 @@ h1.app-title {
   border-radius: 13px;
   position: relative;
   cursor: pointer;
-  transition: background-color 0.25s, box-shadow 0.25s;
+  transition:
+    background-color 0.25s,
+    box-shadow 0.25s;
   background-color: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
@@ -210,8 +223,10 @@ h1.app-title {
   position: absolute;
   top: 3px;
   left: 3px;
-  transition: left 0.25s cubic-bezier(0.16, 1, 0.3, 1), transform 0.1s;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  transition:
+    left 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.1s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .switch-track.enabled .switch-thumb {
@@ -231,7 +246,9 @@ h1.app-title {
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  transition: opacity 0.2s, transform 0.1s;
+  transition:
+    opacity 0.2s,
+    transform 0.1s;
   box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
 }
 
@@ -332,7 +349,7 @@ h1.app-title {
 
 .console-row strong {
   color: var(--text-primary);
-  font-family: 'JetBrains Mono', monospace;
+  font-family: "JetBrains Mono", monospace;
 }
 
 .console-row-block {
@@ -355,7 +372,7 @@ h1.app-title {
 
 .code-block {
   display: block;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 12px;
   word-break: break-all;
   background: rgba(0, 0, 0, 0.2);

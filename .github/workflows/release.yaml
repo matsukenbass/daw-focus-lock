@@ -1,9 +1,9 @@
-name: 'Publish Release'
+name: "Publish Release"
 
 on:
   push:
     tags:
-      - 'v*' # v1.0.0 や v0.1.0 などのタグがプッシュされたら起動
+      - "v*" # v1.0.0 や v0.1.0 などのタグがプッシュされたら起動
 
 permissions:
   contents: write # GitHub Releasesに書き込むために必要
@@ -16,10 +16,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-latest' # Mac版ビルド用
-            args: '--target universal-apple-darwin'
-          - platform: 'windows-latest' # Windows版（exe/msi）ビルド用
-            args: ''
+          - platform: "macos-latest" # Mac版ビルド用
+            args: "--target universal-apple-darwin"
+          - platform: "windows-latest" # Windows版（exe/msi）ビルド用
+            args: ""
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -44,7 +44,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: './src-tauri -> target'
+          workspaces: "./src-tauri -> target"
 
       - name: Install frontend dependencies
         run: pnpm install
@@ -56,8 +56,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'daw-focus-lock ${{ github.ref_name }}'
-          releaseBody: '🤖 GitHub Actions による自動ビルド配信です。'
+          releaseName: "daw-focus-lock ${{ github.ref_name }}"
+          releaseBody: "🤖 GitHub Actions による自動ビルド配信です。"
           releaseDraft: true # 最初は下書き(Draft)として作成（確認後に公開できるので安全）
           prerelease: false
           args: ${{ matrix.args }}
