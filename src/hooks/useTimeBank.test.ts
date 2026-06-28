@@ -60,7 +60,7 @@ describe("useTimeBank (タイムバンク監視フック)", () => {
   const getActiveListeners = async () => {
     // フック内の複数の非同期効果 (setupListener 内の複数の listen 呼び出し) が完了するのを待つ
     for (let i = 0; i < 10; i++) {
-      if (mockEventListeners['window-focus-changed'] && mockEventListeners['accessibility-error']) {
+      if (mockEventListeners["window-focus-changed"] && mockEventListeners["accessibility-error"]) {
         break;
       }
       await act(async () => {
