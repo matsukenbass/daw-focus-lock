@@ -31,31 +31,32 @@ graph TD
 
 ## 🛡️ 主な機能
 
-* **マルチDAW自動検知 & 最前面化**
-  * Studio One / Fender Studio Pro、Cubase、Logic Pro、Ableton Live、FL Studio、Pro Tools などの主要DAWのアクティブ状態を自動検出。
-* **柔軟な制限サービス設定**
-  * X (Twitter)、YouTube (通常動画)、YouTube Shorts、Instagram、mixi2 などのトグル制御。
-  * 各種制限サービスは個別に有効・無効を切り替え可能。
-* **クロスプラットフォーム対応 (macOS & Windows)**
-  * **macOS**: AppleScriptを活用した高精度なアクティブブラウザURL判定に対応。通常YouTubeとYouTube ShortsをURLで厳密に区別できます。
-  * **Windows**: OS制約によるURL取得不可を補う「YouTube/Shortsの一括制限フォールバック」や、裏でサイレントに動作する「PowerShellの非表示実行（一瞬開く黒いウィンドウのポップアップを防止）」を搭載。
-* **アクセシビリティ権限の自己診断 (macOS)**
-  * macOS特有の「システム環境設定上は権限オンだが実際には他アプリを検出できない（ゴースト状態）」バグを自動検知し、ユーザーに対処手順（解決ガイド）を表示します。
+- **マルチDAW自動検知 & 最前面化**
+  - Studio One / Fender Studio Pro、Cubase、Logic Pro、Ableton Live、FL Studio、Pro Tools などの主要DAWのアクティブ状態を自動検出。
+- **柔軟な制限サービス設定**
+  - X (Twitter)、YouTube (通常動画)、YouTube Shorts、Instagram、mixi2 などのトグル制御。
+  - 各種制限サービスは個別に有効・無効を切り替え可能。
+- **クロスプラットフォーム対応 (macOS & Windows)**
+  - **macOS**: AppleScriptを活用した高精度なアクティブブラウザURL判定に対応。通常YouTubeとYouTube ShortsをURLで厳密に区別できます。
+  - **Windows**: OS制約によるURL取得不可を補う「YouTube/Shortsの一括制限フォールバック」や、裏でサイレントに動作する「PowerShellの非表示実行（一瞬開く黒いウィンドウのポップアップを防止）」を搭載。
+- **アクセシビリティ権限の自己診断 (macOS)**
+  - macOS特有の「システム環境設定上は権限オンだが実際には他アプリを検出できない（ゴースト状態）」バグを自動検知し、ユーザーに対処手順（解決ガイド）を表示します。
 
 ---
 
 ## 🛠️ 技術スタック
 
-* **フレームワーク**: Tauri v2
-* **バックエンド (Core)**: Rust
-* **フロントエンド**: React, TypeScript, Vite
-* **デザイン**: CSS (DAWスタジオ・オーディオ機器風ダークテーマ)
+- **フレームワーク**: Tauri v2
+- **バックエンド (Core)**: Rust
+- **フロントエンド**: React, TypeScript, Vite
+- **デザイン**: CSS (DAWスタジオ・オーディオ機器風ダークテーマ)
 
 ---
 
 ## 🚀 開発とビルド
 
 ### 開発環境の立ち上げ
+
 ```bash
 # 依存パッケージのインストール
 pnpm install
@@ -65,6 +66,7 @@ pnpm tauri dev
 ```
 
 ### 本番用パッケージのビルド
+
 ```bash
 # 各OS向けバイナリのビルド・パッケージング
 pnpm tauri build
