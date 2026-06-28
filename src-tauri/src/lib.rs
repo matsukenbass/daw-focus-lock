@@ -141,43 +141,82 @@ mod win32_focus {
     }
 }
 
+#[cfg(target_os = "macos")]
+#[cfg(not(test))]
+fn execute_open(app: &str) -> std::io::Result<std::process::ExitStatus> {
+    std::process::Command::new("open")
+        .args(["-a", app])
+        .spawn()
+        .and_then(|mut child| child.wait())
+}
+
+#[cfg(target_os = "macos")]
+#[cfg(test)]
+fn execute_open(app: &str) -> std::io::Result<std::process::ExitStatus> {
+    if app == "MockApp" {
+        // Return a real successful ExitStatus by spawning a simple command
+        if cfg!(unix) {
+            std::process::Command::new("true").status()
+        } else {
+            std::process::Command::new("cmd").args(["/c", "exit 0"]).status()
+        }
+    } else {
+        Err(std::io::Error::new(std::io::ErrorKind::NotFound, "mock error"))
+    }
+}
+
+#[cfg(target_os = "macos")]
+#[cfg(not(test))]
+fn find_fallback_path() -> std::io::Result<String> {
+    let output = std::process::Command::new("mdfind")
+        .arg("kMDItemContentType == 'com.apple.application-bundle' && kMDItemFSName == '*Studio Pro*'")
+        .output()?;
+    let paths = String::from_utf8_lossy(&output.stdout);
+    if let Some(valid_path) = paths.lines().next() {
+        Ok(valid_path.to_string())
+    } else {
+        Err(std::io::Error::new(std::io::ErrorKind::NotFound, "No fallback application found"))
+    }
+}
+
+#[cfg(target_os = "macos")]
+#[cfg(test)]
+fn find_fallback_path() -> std::io::Result<String> {
+    Ok("FallbackMockApp".to_string())
+}
+
+#[cfg(target_os = "macos")]
+#[cfg(not(test))]
+fn execute_open_path(path: &str) -> std::io::Result<()> {
+    std::process::Command::new("open").arg(path).spawn().map(|_| ())
+}
+
+#[cfg(target_os = "macos")]
+#[cfg(test)]
+fn execute_open_path(path: &str) -> std::io::Result<()> {
+    assert_eq!(path, "FallbackMockApp");
+    Ok(())
+}
+
 /// 指定されたDAWにフォーカスを強制移動
 #[tauri::command]
 fn focus_daw(daw_name: String) {
-    #[cfg(test)]
+    #[cfg(target_os = "macos")]
     {
-        let _ = daw_name;
-        return;
-    }
+        // 1手目: フロントから渡された名前でアプリを最前面化
+        let status = execute_open(&daw_name);
 
-    #[cfg(not(test))]
-    {
-        #[cfg(target_os = "macos")]
-        {
-            // 1手目: フロントから渡された名前でアプリを最前面化
-            let status = std::process::Command::new("open")
-                .args(["-a", &daw_name])
-                .spawn()
-                .and_then(|mut child| child.wait());
-
-            // 2手目: 失敗した場合は「Studio Pro」が含まれるアプリの実体を自動スキャンしてフォールバック
-            if status.is_err() || !status.unwrap().success() {
-                if let Ok(output) = std::process::Command::new("mdfind")
-                    .arg("kMDItemContentType == 'com.apple.application-bundle' && kMDItemFSName == '*Studio Pro*'")
-                    .output()
-                {
-                    let paths = String::from_utf8_lossy(&output.stdout);
-                    if let Some(valid_path) = paths.lines().next() {
-                        let _ = std::process::Command::new("open").arg(valid_path).spawn();
-                    }
-                }
+        // 2手目: 失敗した場合は「Studio Pro」が含まれるアプリの実体を自動スキャンしてフォールバック
+        if status.is_err() || !status.unwrap().success() {
+            if let Ok(valid_path) = find_fallback_path() {
+                let _ = execute_open_path(&valid_path);
             }
         }
+    }
 
-        #[cfg(target_os = "windows")]
-        {
-            let _ = win32_focus::focus_window(&daw_name);
-        }
+    #[cfg(target_os = "windows")]
+    {
+        let _ = win32_focus::focus_window(&daw_name);
     }
 }
 
@@ -199,9 +238,16 @@ fn check_accessibility() -> bool {
 fn open_accessibility_settings() {
     #[cfg(target_os = "macos")]
     {
-        let _ = std::process::Command::new("open")
-            .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
-            .spawn();
+        #[cfg(not(test))]
+        {
+            let _ = std::process::Command::new("open")
+                .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+                .spawn();
+        }
+        #[cfg(test)]
+        {
+            // Test no-op
+        }
     }
 }
 
@@ -300,6 +346,13 @@ mod tests {
     fn 存在しないアプリ名に対するフォーカス強制移動のフォールバック() {
         // Verify that focus_daw handles non-existent apps gracefully without panicking
         focus_daw("NonExistentApplicationNameForTestingOnly".to_string());
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn アプリ名に対するフォーカス強制移動の成功() {
+        // Verify that focus_daw succeeds when the app exists (MockApp)
+        focus_daw("MockApp".to_string());
     }
 
     #[test]

@@ -58,10 +58,15 @@ describe('useTimeBank (タイムバンク監視フック)', () => {
   });
 
   const getActiveListeners = async () => {
-    // フック内の非同期効果 (setupListener) が完了するのを待つ
-    await act(async () => {
-      await Promise.resolve();
-    });
+    // フック内の複数の非同期効果 (setupListener 内の複数の listen 呼び出し) が完了するのを待つ
+    for (let i = 0; i < 10; i++) {
+      if (mockEventListeners['window-focus-changed'] && mockEventListeners['accessibility-error']) {
+        break;
+      }
+      await act(async () => {
+        await Promise.resolve();
+      });
+    }
   };
 
   it('デフォルトの初期状態で初期化されること', async () => {
